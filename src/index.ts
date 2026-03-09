@@ -3,12 +3,17 @@ import path from 'path';
 
 import {
   ASSISTANT_NAME,
+  DINGTALK_LISTEN_PORT,
+  DINGTALK_SECRET,
+  DINGTALK_WEBHOOK_URL,
   IDLE_TIMEOUT,
   MAIN_GROUP_FOLDER,
   POLL_INTERVAL,
   TRIGGER_PATTERN,
+  WEB_UI_PORT,
 } from './config.js';
-import { WhatsAppChannel } from './channels/whatsapp.js';
+import { DingTalkChannel } from './channels/dingtalk.js';
+import { WebChannel } from './channels/web.js';
 import {
   ContainerOutput,
   runContainerAgent,
@@ -48,7 +53,7 @@ let registeredGroups: Record<string, RegisteredGroup> = {};
 let lastAgentTimestamp: Record<string, string> = {};
 let messageLoopRunning = false;
 
-let whatsapp: WhatsAppChannel;
+let dingtalk: DingTalkChannel;
 const channels: Channel[] = [];
 const queue = new GroupQueue();
 
@@ -445,9 +450,49 @@ async function main(): Promise<void> {
   };
 
   // Create and connect channels
-  whatsapp = new WhatsAppChannel(channelOpts);
-  channels.push(whatsapp);
-  await whatsapp.connect();
+  if (!DINGTALK_WEBHOOK_URL || !DINGTALK_SECRET) {
+    logger.fatal('DINGTALK_WEBHOOK_URL and DINGTALK_SECRET must be set in .env');
+    process.exit(1);
+  }
+  dingtalk = new DingTalkChannel({
+    ...channelOpts,
+    webhookUrl: DINGTALK_WEBHOOK_URL,
+    secret: DINGTALK_SECRET,
+    listenPort: DINGTALK_LISTEN_PORT,
+  });
+  channels.push(dingtalk);
+  await dingtalk.connect();
+
+  // Auto-register the DingTalk group under the "main" folder if not yet registered
+  const dingtalkJid = DingTalkChannel.GROUP_JID;
+  if (!registeredGroups[dingtalkJid]) {
+    registerGroup(dingtalkJid, {
+      name: 'DingTalk',
+      folder: MAIN_GROUP_FOLDER,
+      trigger: `@${ASSISTANT_NAME}`,
+      added_at: new Date().toISOString(),
+      requiresTrigger: false,
+    });
+    logger.info({ jid: dingtalkJid }, 'DingTalk group auto-registered');
+  }
+
+  // Create and connect Web Chat UI channel
+  const webChannel = new WebChannel({ ...channelOpts, port: WEB_UI_PORT });
+  channels.push(webChannel);
+  await webChannel.connect();
+
+  // Auto-register the Web Chat group
+  const webJid = WebChannel.GROUP_JID;
+  if (!registeredGroups[webJid]) {
+    registerGroup(webJid, {
+      name: 'Web Chat',
+      folder: MAIN_GROUP_FOLDER,
+      trigger: `@${ASSISTANT_NAME}`,
+      added_at: new Date().toISOString(),
+      requiresTrigger: false,
+    });
+    logger.info({ jid: webJid }, 'Web chat group auto-registered');
+  }
 
   // Start subsystems (independently of connection handler)
   startSchedulerLoop({
@@ -473,7 +518,7 @@ async function main(): Promise<void> {
     },
     registeredGroups: () => registeredGroups,
     registerGroup,
-    syncGroupMetadata: (force) => whatsapp?.syncGroupMetadata(force) ?? Promise.resolve(),
+    syncGroupMetadata: (_force) => Promise.resolve(),
     getAvailableGroups,
     writeGroupsSnapshot: (gf, im, ag, rj) => writeGroupsSnapshot(gf, im, ag, rj),
   });

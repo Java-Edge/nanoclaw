@@ -9,6 +9,10 @@ import { readEnvFile } from './env.js';
 const envConfig = readEnvFile([
   'ASSISTANT_NAME',
   'ASSISTANT_HAS_OWN_NUMBER',
+  'DINGTALK_WEBHOOK_URL',
+  'DINGTALK_SECRET',
+  'DINGTALK_LISTEN_PORT',
+  'WEB_UI_PORT',
 ]);
 
 export const ASSISTANT_NAME =
@@ -67,3 +71,17 @@ export const TRIGGER_PATTERN = new RegExp(
 // Uses system timezone by default
 export const TIMEZONE =
   process.env.TZ || Intl.DateTimeFormat().resolvedOptions().timeZone;
+
+// ── DingTalk 群机器人 ────────────────────────────────────────────────────────
+export const DINGTALK_WEBHOOK_URL =
+  process.env.DINGTALK_WEBHOOK_URL || envConfig.DINGTALK_WEBHOOK_URL || '';
+export const DINGTALK_SECRET =
+  process.env.DINGTALK_SECRET || envConfig.DINGTALK_SECRET || '';
+export const DINGTALK_LISTEN_PORT = parseInt(
+  process.env.DINGTALK_LISTEN_PORT || envConfig.DINGTALK_LISTEN_PORT || '3000',
+  10,
+);
+export const WEB_UI_PORT = parseInt(
+  process.env.WEB_UI_PORT || envConfig.WEB_UI_PORT || '8080',
+  10,
+);

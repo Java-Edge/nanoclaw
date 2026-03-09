@@ -3,8 +3,14 @@
 
 FROM node:22-slim
 
-# Install system dependencies for Chromium
-RUN apt-get update && apt-get install -y \
+# Switch to TUNA mirror for reliability in China, then install deps
+RUN printf "deb https://mirrors.tuna.tsinghua.edu.cn/debian/ bookworm main non-free-firmware\n\
+deb https://mirrors.tuna.tsinghua.edu.cn/debian/ bookworm-updates main non-free-firmware\n\
+deb https://mirrors.tuna.tsinghua.edu.cn/debian-security bookworm-security main non-free-firmware\n\
+" > /etc/apt/sources.list && \
+    rm -f /etc/apt/sources.list.d/debian.sources && \
+    apt-get -o "Acquire::https::Verify-Peer=false" update && \
+    apt-get -o "Acquire::https::Verify-Peer=false" install -y --no-install-recommends \
     chromium \
     fonts-liberation \
     fonts-noto-color-emoji \
